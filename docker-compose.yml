@@ -1,0 +1,15 @@
+services:
+  api:
+    build: .
+    container_name: svc-gateway
+    restart: unless-stopped
+    environment:
+      PORT: ${PORT}
+      COURSES_URL: ${COURSES_URL}
+      NOTES_URL: ${NOTES_URL}
+      USERS_URL: ${USERS_URL}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+    ports:
+      - "8081:3000"
