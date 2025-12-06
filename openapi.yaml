@@ -1,0 +1,97 @@
+openapi: 3.0.3
+info:
+  title: RSO API Gateway
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: READY
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Metrics output
+
+  /api/courses:
+    get:
+      summary: Proxied to Courses service
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Proxied to Courses service (professor only)
+      responses:
+        "201":
+          description: Created
+
+  /api/courses/{courseId}/lectures:
+    get:
+      summary: Proxied to Courses service
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Proxied to Courses service (professor only)
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Created
+
+  /api/lectures/{lectureId}/notes:
+    get:
+      summary: Proxied to Notes service
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Proxied to Notes service
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Created
+
+  /api/users/me:
+    get:
+      summary: Proxied to Users service
+      responses:
+        "200":
+          description: OK
+    put:
+      summary: Proxied to Users service
+      responses:
+        "200":
+          description: OK
