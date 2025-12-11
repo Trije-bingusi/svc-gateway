@@ -11,5 +11,6 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER}
       OIDC_JWKS_URI: ${OIDC_JWKS_URI}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+      CORS_ORIGINS: http://localhost:3003,http://localhost:3000
     ports:
       - "8081:3000"

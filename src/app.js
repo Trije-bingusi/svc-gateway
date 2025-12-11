@@ -2,6 +2,7 @@ import express from "express";
 import client from "prom-client";
 import pinoHttp from "pino-http";
 import YAML from "yamljs";
+import cors from "cors";
 import { apiReference } from "@scalar/express-api-reference";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { requireAuth, requireRoleForWrite } from "./auth.js";
@@ -24,6 +25,24 @@ const USERS_URL = env("USERS_URL");
 // ---- App ----
 const app = express();
 app.use(pinoHttp());
+
+// ---- CORS ----
+const CORS_ORIGINS = (process.env.CORS_ORIGINS ||
+  "http://localhost:3003,http://localhost:3000").split(",");
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Authorization", "Content-Type"],
+  credentials: false
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions))
 
 // ---- OpenAPI + docs ----
 const openapi = YAML.load("./openapi.yaml");
