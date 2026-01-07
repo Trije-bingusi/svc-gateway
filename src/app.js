@@ -46,11 +46,12 @@ app.options(/.*/, cors(corsOptions))
 
 // ---- OpenAPI + docs ----
 const openapi = YAML.load("./openapi.yaml");
-app.get("/openapi.json", (_req, res) => res.json(openapi));
+app.get("/docs/gateway/openapi.json", (_req, res) => res.json(openapi));
+
 app.use(
-  "/docs",
+  "/docs/gateway",
   apiReference({
-    spec: { url: "/openapi.json" },
+    spec: { url: "/docs/gateway/openapi.json" },
     theme: "default",
     darkMode: true
   })

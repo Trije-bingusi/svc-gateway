@@ -31,25 +31,10 @@ env:
   - name: OIDC_AUDIENCE
     value: rso-frontend
 
-  # CORS for local frontend + dev gateway hostname
+  # CORS for local frontend + dev IP
   - name: CORS_ORIGINS
-    value: http://localhost:3003,http://gateway-rso-dev.local
+    value: http://localhost:3003,http://74.161.129.128
 
 ingress:
   enabled: true
   className: nginx
-  hosts:
-    - host: gateway-rso-dev.local
-      paths:
-        - path: /api/
-          pathType: Prefix
-        - path: /docs
-          pathType: Prefix
-        - path: /openapi.json
-          pathType: Prefix
-        - path: /metrics
-          pathType: Prefix
-        - path: /healthz
-          pathType: Prefix
-        - path: /readyz
-          pathType: Prefix
