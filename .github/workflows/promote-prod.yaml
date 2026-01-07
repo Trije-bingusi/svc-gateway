@@ -96,9 +96,10 @@ jobs:
     - name: Deploy to AKS using Helm
       run: |
         helm upgrade --install "$RELEASE_NAME" ./helm \
-          --namespace $K8S_NAMESPACE \
+          --namespace "$K8S_NAMESPACE" \
           --values ./helm/values.yaml \
           --values "$VALUES_FILE" \
-          --set appVersion="$SEMVER_TAG" \
-          --set image="${ACR_LOGIN_SERVER}/${IMAGE_NAME}@${DIGEST}"
+          --set image="${{ needs.build-and-push.outputs.image_tag }}" \
+          --set ingress.defaultHost="${INGRESS_IP}.nip.io"
+
       
