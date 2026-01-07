@@ -1,3 +1,5 @@
+# Dev overrides for svc-gateway
+
 resources:
   limits:
     cpu: 200m
@@ -5,4 +7,49 @@ resources:
   requests:
     cpu: 50m
     memory: 128Mi
-    
+
+env:
+  - name: PORT
+    value: "3000"
+
+  # Upstreams (dev release names)
+  - name: COURSES_URL
+    value: http://svc-courses-dev-svc-courses.rso.svc.cluster.local
+  - name: NOTES_URL
+    value: http://svc-notes-dev-svc-notes.rso.svc.cluster.local
+  - name: USERS_URL
+    value: http://svc-users-dev-svc-users.rso.svc.cluster.local
+
+  # OIDC (dev Keycloak host map in /etc/hosts)
+  - name: OIDC_ISSUER
+    value: http://keycloak-rso-dev.local/realms/rso
+
+  # JWKS reachable inside cluster (service DNS)
+  - name: OIDC_JWKS_URI
+    value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
+
+  - name: OIDC_AUDIENCE
+    value: rso-frontend
+
+  # CORS for local frontend + dev gateway hostname
+  - name: CORS_ORIGINS
+    value: http://localhost:3003,http://gateway-rso-dev.local
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: gateway-rso-dev.local
+      paths:
+        - path: /api/
+          pathType: Prefix
+        - path: /docs
+          pathType: Prefix
+        - path: /openapi.json
+          pathType: Prefix
+        - path: /metrics
+          pathType: Prefix
+        - path: /healthz
+          pathType: Prefix
+        - path: /readyz
+          pathType: Prefix

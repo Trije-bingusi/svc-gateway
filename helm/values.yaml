@@ -25,11 +25,9 @@ env:
   - name: USERS_URL
     value: http://svc-users-dev-svc-users.rso.svc.cluster.local
 
-  # issuer must match what tokens contain
   - name: OIDC_ISSUER
-    value: http://keycloak.local/realms/rso
+    value: http://keycloak-rso-dev.local/realms/rso
 
-  # JWKS should be reachable from inside the cluster
   - name: OIDC_JWKS_URI
     value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
 
@@ -37,7 +35,8 @@ env:
     value: rso-frontend
 
   - name: CORS_ORIGINS
-    value: http://localhost:3003,http://74.161.129.128
+    value: http://localhost:3003,http://gateway-rso-dev.local
+
 
 # Service configuration for exposing the application
 service:
@@ -49,7 +48,8 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - paths:
+    - host: gateway-rso-dev.local
+      paths:
         - path: /api/
           pathType: Prefix
         - path: /docs
@@ -62,6 +62,7 @@ ingress:
           pathType: Prefix
         - path: /readyz
           pathType: Prefix
+
 
 # Health check probes configuration
 probes:

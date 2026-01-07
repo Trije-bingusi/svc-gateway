@@ -1,3 +1,5 @@
+# Prod overrides for svc-gateway
+
 resources:
   limits:
     cpu: 400m
@@ -5,3 +7,49 @@ resources:
   requests:
     cpu: 200m
     memory: 256Mi
+
+env:
+  - name: PORT
+    value: "3000"
+
+  # Upstreams (prod release names)
+  - name: COURSES_URL
+    value: http://svc-courses-prod-svc-courses.rso.svc.cluster.local
+  - name: NOTES_URL
+    value: http://svc-notes-prod-svc-notes.rso.svc.cluster.local
+  - name: USERS_URL
+    value: http://svc-users-prod-svc-users.rso.svc.cluster.local
+
+  # OIDC (prod Keycloak host map in /etc/hosts)
+  - name: OIDC_ISSUER
+    value: http://keycloak-rso-prod.local/realms/rso
+
+  # JWKS reachable inside cluster (service DNS)
+  - name: OIDC_JWKS_URI
+    value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
+
+  - name: OIDC_AUDIENCE
+    value: rso-frontend
+
+  # CORS for prod frontend + prod gateway hostname (adjust frontend domain later)
+  - name: CORS_ORIGINS
+    value: http://gateway-rso-prod.local
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: gateway-rso-prod.local
+      paths:
+        - path: /api/
+          pathType: Prefix
+        - path: /docs
+          pathType: Prefix
+        - path: /openapi.json
+          pathType: Prefix
+        - path: /metrics
+          pathType: Prefix
+        - path: /healthz
+          pathType: Prefix
+        - path: /readyz
+          pathType: Prefix
