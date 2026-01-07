@@ -32,8 +32,18 @@ Upon success, the image will be pushed to ACR and the immutable image tag printe
 ./scripts/deploy/deploy.sh <image-tag>
 ```
 
-## TODO / Fixes
+## /etc/hosts setup
 
-- (Optional) Add **TLS support** in Helm ingress configuration for secure HTTPS access.
-- Replace raw ingress IP usage with a **proper DNS domain** (e.g., `gateway.local` or real cluster domain).
-- Ensure upstream service URLs work for both envs using **environment-specific Helm values** or dynamic config.
+To access **Keycloak** and the **Gateway** via domain names, add these lines to:
+- Windows: ```C:\Windows\System32\drivers\etc\hosts```
+- Linux/macOS: ```/etc/hosts```
+
+```
+ingress external IP    keycloak-rso-dev.local
+ingress external IP    gateway-rso-dev.local
+```
+
+Easiest way to find the ingress external IP is to run the following command and copy the IP from the `ADDRESS` column:
+```bash
+kubectl -n rso get ingress
+```
