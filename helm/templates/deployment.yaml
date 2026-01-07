@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helm.fullname" . }}
+  labels:
+    # Only use helm.sh/chart for the deployment metadata to avoid unnecessary
+    # changes to the pods which would trigger restarts. 
+    helm.sh/chart: {{ include "helm.chart" . }}
+    {{- include "helm.labels" . | nindent 4 }}  # common labels
+
+spec:
+  replicas: {{ .Values.replicaCount }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
+
+  # Deployment strategy configuration
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+
+  # Specify how to identify Pods managed by this Deployment
+  selector:
+    matchLabels:
+      {{- include "helm.selectorLabels" . | nindent 6 }} # these are also included in common helm.labels
+
+  # Define the Pod template
+  template:
+    metadata:
+      labels:
+        {{- include "helm.labels" . | nindent 8 }}
+
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+
+          # Environment variables
+          {{- if .Values.env }}
+          env:
+            {{-  .Values.env | toYaml | nindent 12 }}
+          {{- end }}
+
+          # Set up the container image
+          image: "{{ .Values.image }}"
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          
+          # Define the probes which are enabled in values.yaml
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: {{ .Values.containerPort }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+
+          # Use resource requests and limits from values.yaml
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
