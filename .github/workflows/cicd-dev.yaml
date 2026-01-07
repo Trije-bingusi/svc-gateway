@@ -128,7 +128,8 @@ jobs:
           --namespace $K8S_NAMESPACE \
           --values ./helm/values.yaml \
           --values "$VALUES_FILE" \
-          --set image="${{ needs.build-and-push.outputs.image_tag }}"
+          --set image="${{ needs.build-and-push.outputs.image_tag }} \
+          --set ingress.defaultHost="${INGRESS_IP}.nip.io"
 
 
   # TODO: Smoke tests on dev deployment
