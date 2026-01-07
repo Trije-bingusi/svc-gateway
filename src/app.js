@@ -81,15 +81,10 @@ function makeProxy(target, serviceName) {
     target,
     changeOrigin: true,
     logLevel: "silent",
-
-    pathRewrite: (path, req) => `${req.baseUrl}${path}`,
-
     on: {
       proxyReq: (proxyReq, req) => {
         proxiedCounter.inc({ service: serviceName, method: req.method });
-        if (req.user?.sub) {
-          proxyReq.setHeader("x-user-sub", String(req.user.sub));
-        }
+        if (req.user?.sub) proxyReq.setHeader("x-user-sub", String(req.user.sub));
       }
     }
   });
