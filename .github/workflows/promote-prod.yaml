@@ -102,4 +102,6 @@ jobs:
           --set image="${{ needs.build-and-push.outputs.image_tag }}" \
           --set ingress.defaultHost="${INGRESS_IP}.nip.io"
 
-      
+
+
+  # TODO: Smoke tests on dev deployment
