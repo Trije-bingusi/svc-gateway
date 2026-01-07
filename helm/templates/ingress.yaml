@@ -7,13 +7,25 @@ metadata:
     {{- include "helm.labels" . | nindent 4 }}
   annotations:
     kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
+    {{- end }}
 
 spec:
   ingressClassName: {{ .Values.ingress.className }}
-  # TODO: Add TLS configuration
+  
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.hosts }}
+        - {{ .host | default $.Values.ingress.defaultHost }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+
   rules:
     {{- range .Values.ingress.hosts }}
-    - host: {{ .host | default "" }}
+    - host: {{ .host | default $.Values.ingress.defaultHost }}
       http:
         paths:
           {{- range .paths }}

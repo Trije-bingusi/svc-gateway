@@ -35,7 +35,7 @@ env:
     value: rso-frontend
 
   - name: CORS_ORIGINS
-    value: http://localhost:3003,http://gateway-rso-dev.local
+    value: http://localhost:3003,http://74.161.129.128
 
 
 # Service configuration for exposing the application
@@ -45,16 +45,13 @@ service:
 
 # Ingress configuration for external access
 ingress:
+  defaultHost: ""        # set via --set ingress.defaultHost=... in deploy.sh
   enabled: true
   className: nginx
   hosts:
-    - host: gateway-rso-dev.local
+    - host: ""           # template can default to ingress.defaultHost
       paths:
         - path: /api/
-          pathType: Prefix
-        - path: /docs
-          pathType: Prefix
-        - path: /openapi.json
           pathType: Prefix
         - path: /metrics
           pathType: Prefix
@@ -62,7 +59,13 @@ ingress:
           pathType: Prefix
         - path: /readyz
           pathType: Prefix
+        - path: /docs/gateway
+          pathType: Prefix
 
+  tls:
+    enabled: true
+    secretName: gateway-tls
+    clusterIssuer: letsencrypt
 
 # Health check probes configuration
 probes:
