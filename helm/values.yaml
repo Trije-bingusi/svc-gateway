@@ -26,7 +26,7 @@ env:
     value: http://svc-users-dev-svc-users.rso.svc.cluster.local
 
   - name: OIDC_ISSUER
-    value: http://keycloak-rso-dev.local/realms/rso
+    value: http://keycloak.keycloak.svc.cluster.local/realms/rso
 
   - name: OIDC_JWKS_URI
     value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
@@ -35,7 +35,7 @@ env:
     value: rso-frontend
 
   - name: CORS_ORIGINS
-    value: http://localhost:3003,http://74.161.129.128
+    value: http://localhost:3003,http://74.161.129.128 # TODO: when this is tested, should be set dynamically in deploy.sh or cicd
 
 
 # Service configuration for exposing the application
@@ -64,8 +64,7 @@ ingress:
 
   tls:
     enabled: true
-    secretName: gateway-tls
-    clusterIssuer: letsencrypt
+    secretName: nip-tls
 
 # Health check probes configuration
 probes:
