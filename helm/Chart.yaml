@@ -1,0 +1,7 @@
+apiVersion: v2
+name: svc-gateway
+description: API Gateway / BFF
+
+type: application
+version: 0.1.0
+appVersion: "vX.Y.Z"

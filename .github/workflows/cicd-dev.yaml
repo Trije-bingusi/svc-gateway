@@ -1,0 +1,134 @@
+name: CI/CD Pipeline (Dev Cluster)
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE_NAME: svc-gateway
+  IMAGE_PLATFORMS: linux/amd64,linux/arm64
+  RELEASE_NAME: svc-gateway-dev
+  K8S_NAMESPACE: rso
+  VALUES_FILE: ./helm/environments/values-dev.yaml
+  
+jobs:
+  # TODO: Unit tests
+
+  build-and-push:
+    name: Build and Push Docker Image to ACR
+    runs-on: ubuntu-latest
+    environment: dev  # Does not matter much, ACR is the same for all envs
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Fetch ACR Login Server from Key Vault
+      id: acr
+      run: |
+        ACR_LOGIN_SERVER=$(az keyvault secret show \
+          --vault-name ${{ vars.KEYVAULT_NAME }} \
+          --name acr-login-server \
+          --query value -o tsv
+        )
+        echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
+
+    - name: Login to ACR
+      run: |
+        az acr login --name ${{ env.ACR_LOGIN_SERVER }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Define Image Tags
+      run: |
+        TIMESTAMP="$(date -u +"%Y%m%d-%H%M%S")"
+        TAG_PREFIX="${ACR_LOGIN_SERVER}/${IMAGE_NAME}"
+        
+        SHA_TAG="${TAG_PREFIX}:$GITHUB_SHA"
+        TIMESTAMP_TAG="${TAG_PREFIX}:${TIMESTAMP}"
+        
+        IMAGE_TAGS="${SHA_TAG},${TIMESTAMP_TAG}"
+        echo "IMAGE_TAGS=$IMAGE_TAGS" >> $GITHUB_ENV
+
+    - name:  Build and Push Docker Image
+      id: build
+      uses: docker/build-push-action@v6 
+      with:
+        context: .
+        push: true
+        platforms: ${{ env.IMAGE_PLATFORMS }}
+        tags: ${{ env.IMAGE_TAGS }}
+
+    - name: Output Image Tag with Digest
+      id: tag
+      run: |
+        DIGEST=${{ steps.build.outputs.digest }}
+        TAG_WITH_DIGEST="${ACR_LOGIN_SERVER}/${IMAGE_NAME}@${DIGEST}"
+        echo "tag=$TAG_WITH_DIGEST" >> $GITHUB_OUTPUT
+
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+
+
+  deploy-dev:
+    name: Deploy to Dev AKS Cluster
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Fetch AKS Config from Key Vault
+      run: |
+        fetch_secret() {
+          az keyvault secret show \
+            --vault-name ${{ vars.KEYVAULT_NAME }} \
+            --name "$1" \
+            --query value -o tsv
+        }
+
+        echo "RESOURCE_GROUP_NAME=$(fetch_secret rg-name)" >> $GITHUB_ENV
+        echo "AKS_CLUSTER_NAME=$(fetch_secret aks-name)" >> $GITHUB_ENV
+
+    - name: Update Chart appVersion
+      run: |
+        sed -i "s/^appVersion: .*$/appVersion: \"$GITHUB_SHA\"/" ./helm/Chart.yaml
+
+    - name: Authenticate to AKS
+      run: |
+        az aks get-credentials \
+          --resource-group "$RESOURCE_GROUP_NAME" \
+          --name "$AKS_CLUSTER_NAME" \
+          --overwrite-existing
+
+    - name: Deploy to AKS using Helm
+      run: |
+        helm upgrade --install $RELEASE_NAME ./helm \
+          --namespace $K8S_NAMESPACE \
+          --values ./helm/values.yaml \
+          --values "$VALUES_FILE" \
+          --set image="${{ needs.build-and-push.outputs.image_tag }}"
+
+
+  # TODO: Smoke tests on dev deployment

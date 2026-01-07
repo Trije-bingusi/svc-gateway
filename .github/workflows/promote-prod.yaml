@@ -1,0 +1,104 @@
+name: CD Promotion Pipeline (Prod Cluster)
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE_NAME: svc-gateway
+  RELEASE_NAME: svc-gateway-prod
+  K8S_NAMESPACE: rso
+  VALUES_FILE: ./helm/environments/values-prod.yaml
+
+jobs:
+
+  deploy-prod:
+    name: Promote to Prod AKS Cluster
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Fetch AKS and ACR Config from Key Vault
+      run: |
+        fetch_secret() {
+          az keyvault secret show \
+            --vault-name ${{ vars.KEYVAULT_NAME }} \
+            --name "$1" \
+            --query value -o tsv
+        }
+
+        echo "RESOURCE_GROUP_NAME=$(fetch_secret rg-name)" >> $GITHUB_ENV
+        echo "AKS_CLUSTER_NAME=$(fetch_secret aks-name)" >> $GITHUB_ENV
+        echo "ACR_LOGIN_SERVER=$(fetch_secret acr-login-server)" >> $GITHUB_ENV
+
+    - name: Get Commit SHA and Semantic Version For Tag
+      run: |
+        SEMVER_TAG="${GITHUB_REF#refs/tags/}"
+        COMMIT_SHA=$(git rev-list -n 1 "$SEMVER_TAG")
+        echo "Resolved tag '$SEMVER_TAG' to commit $COMMIT_SHA"
+        echo "SEMVER_TAG=$SEMVER_TAG" >> $GITHUB_ENV
+        echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
+
+    - name: Update Chart appVersion
+      run: |
+        sed -i "s/^appVersion: .*$/appVersion: \"$SEMVER_TAG\"/" ./helm/Chart.yaml
+
+    - name: Get Immutable Image Digest from ACR
+      run: |
+        echo "Checking image digest for tag $COMMIT_SHA"
+
+        DIGEST=$(az acr repository show-manifests \
+          --name "$ACR_LOGIN_SERVER" \
+          --repository "$IMAGE_NAME" \
+          --query "[?tags[?@=='$COMMIT_SHA']].digest | [0]" \
+          -o tsv)
+
+        if [ -z "$DIGEST" ]; then
+          echo "ERROR: No digest found for image tag '$COMMIT_SHA'." >&2
+          echo "This commit was never built or deployed to dev." >&2
+          exit 1
+        fi
+        
+        TAG_WITH_DIGEST="${ACR_LOGIN_SERVER}/${IMAGE_NAME}@${DIGEST}"
+        echo "Found image digest: $DIGEST"
+        echo "DIGEST=$DIGEST" >> $GITHUB_ENV
+
+    - name: Tag Image with Semantic Version
+      run: |
+        echo "Tagging digest $DIGEST as '$SEMVER_TAG'"
+        az acr import \
+          --name "$ACR_LOGIN_SERVER" \
+          --source "${ACR_LOGIN_SERVER}/${IMAGE_NAME}@$DIGEST" \
+          --image "${IMAGE_NAME}:${SEMVER_TAG}" \
+          --force
+
+    - name: Authenticate to AKS
+      run: |
+        az aks get-credentials \
+          --resource-group "$RESOURCE_GROUP_NAME" \
+          --name "$AKS_CLUSTER_NAME" \
+          --overwrite-existing
+
+    - name: Deploy to AKS using Helm
+      run: |
+        helm upgrade --install "$RELEASE_NAME" ./helm \
+          --namespace $K8S_NAMESPACE \
+          --values ./helm/values.yaml \
+          --values "$VALUES_FILE" \
+          --set appVersion="$SEMVER_TAG" \
+          --set image="${ACR_LOGIN_SERVER}/${IMAGE_NAME}@${DIGEST}"
+      

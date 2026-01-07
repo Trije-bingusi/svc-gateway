@@ -1,0 +1,89 @@
+replicaCount: 2       # Number of desired pod replicas
+minReadySeconds: 10   # Minimum number of seconds a pod should be ready before being considered available
+
+containerPort: 3000   # Port on which the container listens.
+image: "<needs to be set>" # using --set flags during helm install/upgrade
+
+# Resource requests and limits for the container
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# Environment variables for the container
+env:
+  - name: PORT
+    value: "3000"
+
+  - name: COURSES_URL
+    value: http://svc-courses-dev-svc-courses.rso.svc.cluster.local
+  - name: NOTES_URL
+    value: http://svc-notes-dev-svc-notes.rso.svc.cluster.local
+  - name: USERS_URL
+    value: http://svc-users-dev-svc-users.rso.svc.cluster.local
+
+  # issuer must match what tokens contain
+  - name: OIDC_ISSUER
+    value: http://keycloak.local/realms/rso
+
+  # JWKS should be reachable from inside the cluster
+  - name: OIDC_JWKS_URI
+    value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
+
+  - name: OIDC_AUDIENCE
+    value: rso-frontend
+
+  - name: CORS_ORIGINS
+    value: http://localhost:3003,http://74.161.129.128
+
+# Service configuration for exposing the application
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress configuration for external access
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - paths:
+        - path: /api/
+          pathType: Prefix
+        - path: /docs
+          pathType: Prefix
+        - path: /openapi.json
+          pathType: Prefix
+        - path: /metrics
+          pathType: Prefix
+        - path: /healthz
+          pathType: Prefix
+        - path: /readyz
+          pathType: Prefix
+
+# Health check probes configuration
+probes:
+  liveness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+  readiness:
+    enabled: true
+    path: /readyz
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 6
+    failureThreshold: 6
+
+  startup:
+    enabled: true
+    path: /healthz
+    periodSeconds: 2
+    timeoutSeconds: 2
+    failureThreshold: 30
