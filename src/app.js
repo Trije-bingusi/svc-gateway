@@ -66,6 +66,13 @@ const proxiedCounter = new client.Counter({
   labelNames: ["service", "method"]
 });
 
+const responseTimeHistogram = new client.Histogram({
+  name: "svc_gateway_response_time_seconds",
+  help: "Response time in seconds",
+  labelNames: ["service", "method", "status_code"],
+  buckets: [0.05, 0.1, 0.3, 0.5, 0.7, 1, 1.5, 2, 5]
+})
+
 app.get("/metrics", async (_req, res) => {
   res.set("Content-Type", client.register.contentType);
   res.end(await client.register.metrics());
@@ -87,8 +94,21 @@ function makeProxy(target, serviceName, upstreamPrefix) {
 
     on: {
       proxyReq: (proxyReq, req) => {
+        req._startTime = process.hrtime();
         proxiedCounter.inc({ service: serviceName, method: req.method });
         if (req.user?.sub) proxyReq.setHeader("x-user-sub", String(req.user.sub));
+      },
+
+      proxyRes: (proxyRes, req) => {
+        // Record response time
+        const diff = process.hrtime(req._startTime);
+        const durationInSeconds = diff[0] + diff[1] / 1e9;
+
+        responseTimeHistogram.observe({
+          service: serviceName,
+          method: req.method,
+          status_code: proxyRes.statusCode
+        }, durationInSeconds);
       }
     }
   });
