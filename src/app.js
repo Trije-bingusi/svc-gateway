@@ -77,11 +77,14 @@ app.get("/readyz", (_req, res) => res.send("READY"));
 
 // ---- Proxies ----
 
-function makeProxy(target, serviceName) {
+function makeProxy(target, serviceName, upstreamPrefix) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
     logLevel: "silent",
+
+    pathRewrite: (path) => `${upstreamPrefix}${path}`,
+
     on: {
       proxyReq: (proxyReq, req) => {
         proxiedCounter.inc({ service: serviceName, method: req.method });
@@ -91,14 +94,9 @@ function makeProxy(target, serviceName) {
   });
 }
 
-// Courses proxy
-const coursesProxy = makeProxy(COURSES_URL, "courses");
-
-// Notes proxy
-const notesProxy = makeProxy(NOTES_URL, "notes");
-
-// Users proxy
-const usersProxy = makeProxy(USERS_URL, "users");
+const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
+const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
+const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
 
 /**
  * Auth + Authorization rules
