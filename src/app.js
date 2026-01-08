@@ -21,6 +21,8 @@ const PORT = Number(env("PORT", "3000"));
 const COURSES_URL = env("COURSES_URL");
 const NOTES_URL = env("NOTES_URL");
 const USERS_URL = env("USERS_URL");
+const VIDEO_UPLOAD_URL = env("VIDEO_UPLOAD_URL");
+const TRANSCRIPTION_URL = env("TRANSCRIPTION_URL");
 
 // ---- App ----
 const app = express();
@@ -100,6 +102,12 @@ const notesProxy = makeProxy(NOTES_URL, "notes");
 // Users proxy
 const usersProxy = makeProxy(USERS_URL, "users");
 
+// Video upload proxy
+const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
+
+// Transcription proxy
+const transcriptionProxy = makeProxy(TRANSCRIPTION_URL, "transcription");
+
 /**
  * Auth + Authorization rules
  * - All routes require auth
@@ -114,11 +122,31 @@ app.use(
   coursesProxy
 );
 
-// Notes are at /api/lectures/.../notes in svc-notes
-app.use("/api/lectures", requireAuth(), notesProxy);
+// Lecture-specific routes - check path to determine which service
+app.use("/api/lectures", requireAuth(), (req, res, next) => {
+  if (req.path.includes('/upload')) {
+    return videoUploadProxy(req, res, next);
+  }
+  if (req.path.includes('/notes')) {
+    return notesProxy(req, res, next);
+  }
+  if (req.path.includes('/transcribe')) {
+    return transcriptionProxy(req, res, next);
+  }
+  return coursesProxy(req, res, next);
+});
+
+// Video uploads
+app.use("/api/uploads", requireAuth(), videoUploadProxy);
+
+// Transcriptions
+app.use("/api/transcriptions", requireAuth(), transcriptionProxy);
 
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
+
+// Video streaming (no auth required for video playback)
+app.use("/api/videos", videoUploadProxy);
 
 // ---- Error handling ----
 app.use((err, _req, res, _next) => {
@@ -129,5 +157,5 @@ app.use((err, _req, res, _next) => {
 // ---- Start ----
 app.listen(PORT, () => {
   console.log("Gateway listening on port", PORT);
-  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL });
+  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTION_URL });
 });
