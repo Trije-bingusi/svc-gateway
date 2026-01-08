@@ -26,16 +26,16 @@ env:
     value: http://svc-users-dev-svc-users.rso.svc.cluster.local
 
   - name: OIDC_ISSUER
-    value: http://keycloak.keycloak.svc.cluster.local/realms/rso
+    value: https://74.161.129.128.nip.io/keycloak/realms/rso
 
   - name: OIDC_JWKS_URI
-    value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
+    value: http://keycloak.keycloak.svc.cluster.local/keycloak/realms/rso/protocol/openid-connect/certs
 
   - name: OIDC_AUDIENCE
     value: rso-frontend
 
   - name: CORS_ORIGINS
-    value: http://localhost:3003,http://74.161.129.128 # TODO: when this is tested, should be set dynamically in deploy.sh or cicd
+    value: http://localhost:3003,http://74.161.129.128.nip.io,https://74.161.129.128.nip.io # TODO: when this is tested, should be set dynamically in deploy.sh or cicd
 
 
 # Service configuration for exposing the application

@@ -7,34 +7,3 @@ resources:
   requests:
     cpu: 200m
     memory: 256Mi
-
-env:
-  - name: PORT
-    value: "3000"
-
-  # Upstreams (prod release names)
-  - name: COURSES_URL
-    value: http://svc-courses-prod-svc-courses.rso.svc.cluster.local
-  - name: NOTES_URL
-    value: http://svc-notes-prod-svc-notes.rso.svc.cluster.local
-  - name: USERS_URL
-    value: http://svc-users-prod-svc-users.rso.svc.cluster.local
-
-  # OIDC (prod Keycloak host map in /etc/hosts)
-  - name: OIDC_ISSUER
-    value: http://keycloak-rso-prod.local/realms/rso
-
-  # JWKS reachable inside cluster (service DNS)
-  - name: OIDC_JWKS_URI
-    value: http://keycloak.keycloak.svc.cluster.local/realms/rso/protocol/openid-connect/certs
-
-  - name: OIDC_AUDIENCE
-    value: rso-frontend
-
-  # CORS for prod frontend + prod IP
-  - name: CORS_ORIGINS
-    value: http://localhost:3003,http://74.161.129.128
-
-ingress:
-  enabled: true
-  className: nginx
