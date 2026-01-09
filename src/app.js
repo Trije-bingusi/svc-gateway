@@ -21,8 +21,8 @@ const PORT = Number(env("PORT", "3000"));
 const COURSES_URL = env("COURSES_URL");
 const NOTES_URL = env("NOTES_URL");
 const USERS_URL = env("USERS_URL");
+const TRANSCRIPTIONS_URL = env("TRANSCRIPTIONS_URL");
 const VIDEO_UPLOAD_URL = env("VIDEO_UPLOAD_URL");
-const TRANSCRIPTION_URL = env("TRANSCRIPTION_URL");
 
 // ---- App ----
 const app = express();
@@ -68,6 +68,13 @@ const proxiedCounter = new client.Counter({
   labelNames: ["service", "method"]
 });
 
+const responseTimeHistogram = new client.Histogram({
+  name: "svc_gateway_response_time_seconds",
+  help: "Response time in seconds",
+  labelNames: ["service", "method", "status_code"],
+  buckets: [0.05, 0.1, 0.3, 0.5, 0.7, 1, 1.5, 2, 5]
+})
+
 app.get("/metrics", async (_req, res) => {
   res.set("Content-Type", client.register.contentType);
   res.end(await client.register.metrics());
@@ -79,34 +86,43 @@ app.get("/readyz", (_req, res) => res.send("READY"));
 
 // ---- Proxies ----
 
-function makeProxy(target, serviceName) {
+function makeProxy(target, serviceName, upstreamPrefix) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
     logLevel: "silent",
+
+    pathRewrite: (path) => `${upstreamPrefix}${path}`,
+
     on: {
       proxyReq: (proxyReq, req) => {
+        req._startTime = process.hrtime();
         proxiedCounter.inc({ service: serviceName, method: req.method });
         if (req.user?.sub) proxyReq.setHeader("x-user-sub", String(req.user.sub));
+      },
+
+      proxyRes: (proxyRes, req) => {
+        // Record response time
+        const diff = process.hrtime(req._startTime);
+        const durationInSeconds = diff[0] + diff[1] / 1e9;
+
+        responseTimeHistogram.observe({
+          service: serviceName,
+          method: req.method,
+          status_code: proxyRes.statusCode
+        }, durationInSeconds);
       }
     }
   });
 }
 
-// Courses proxy
-const coursesProxy = makeProxy(COURSES_URL, "courses");
-
-// Notes proxy
-const notesProxy = makeProxy(NOTES_URL, "notes");
-
-// Users proxy
-const usersProxy = makeProxy(USERS_URL, "users");
+const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
+const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
+const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
+const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
 
 // Video upload proxy
 const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
-
-// Transcription proxy
-const transcriptionProxy = makeProxy(TRANSCRIPTION_URL, "transcription");
 
 /**
  * Auth + Authorization rules
@@ -145,6 +161,8 @@ app.use("/api/transcriptions", requireAuth(), transcriptionProxy);
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
 
+app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
+
 // Video streaming (no auth required for video playback)
 app.use("/api/videos", videoUploadProxy);
 
@@ -157,5 +175,5 @@ app.use((err, _req, res, _next) => {
 // ---- Start ----
 app.listen(PORT, () => {
   console.log("Gateway listening on port", PORT);
-  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTION_URL });
+  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
 });
