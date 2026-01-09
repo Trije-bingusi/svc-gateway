@@ -13,6 +13,7 @@ resources:
     cpu: 50m
     memory: 128Mi
 
+# TODO: Refactor thies environment variable config
 # Environment variables for the container
 env:
   - name: PORT
@@ -24,6 +25,10 @@ env:
     value: http://svc-notes-dev-svc-notes.rso.svc.cluster.local
   - name: USERS_URL
     value: http://svc-users-dev-svc-users.rso.svc.cluster.local
+  - name: TRANSCRIPTIONS_URL
+    value: http://svc-transcription-dev-svc-transcription.rso.svc.cluster.local
+  - name: VIDEO_UPLOAD_URL
+    value: http://svc-video-dev-svc-video.rso.svc.cluster.local
 
   - name: OIDC_ISSUER
     value: https://74.161.129.128.nip.io/keycloak/realms/rso

@@ -120,8 +120,6 @@ const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
 const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
 const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
 const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
-
-// Video upload proxy
 const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
 
 /**
@@ -147,7 +145,7 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
     return notesProxy(req, res, next);
   }
   if (req.path.includes('/transcribe')) {
-    return transcriptionProxy(req, res, next);
+    return transcriptionsProxy(req, res, next);
   }
   return coursesProxy(req, res, next);
 });
@@ -156,7 +154,7 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
 app.use("/api/uploads", requireAuth(), videoUploadProxy);
 
 // Transcriptions
-app.use("/api/transcriptions", requireAuth(), transcriptionProxy);
+app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
