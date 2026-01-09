@@ -21,6 +21,7 @@ const PORT = Number(env("PORT", "3000"));
 const COURSES_URL = env("COURSES_URL");
 const NOTES_URL = env("NOTES_URL");
 const USERS_URL = env("USERS_URL");
+const TRANSCRIPTIONS_URL = env("TRANSCRIPTIONS_URL");
 
 // ---- App ----
 const app = express();
@@ -117,6 +118,8 @@ function makeProxy(target, serviceName, upstreamPrefix) {
 const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
 const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
 const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
+const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
+
 
 /**
  * Auth + Authorization rules
@@ -138,6 +141,8 @@ app.use("/api/lectures", requireAuth(), notesProxy);
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
 
+app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
+
 // ---- Error handling ----
 app.use((err, _req, res, _next) => {
   console.error(err);
@@ -147,5 +152,5 @@ app.use((err, _req, res, _next) => {
 // ---- Start ----
 app.listen(PORT, () => {
   console.log("Gateway listening on port", PORT);
-  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL });
+  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, TRANSCRIPTIONS_URL });
 });
