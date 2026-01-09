@@ -1,11 +1,12 @@
 import express from "express";
 import client from "prom-client";
-import pinoHttp from "pino-http";
 import YAML from "yamljs";
 import cors from "cors";
 import { apiReference } from "@scalar/express-api-reference";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { requireAuth, requireRoleForWrite } from "./auth.js";
+import { logger, httpLogger } from "./logging.js";
+
 
 function env(name, fallback) {
   const raw = process.env[name];
@@ -26,7 +27,7 @@ const VIDEO_UPLOAD_URL = env("VIDEO_UPLOAD_URL");
 
 // ---- App ----
 const app = express();
-app.use(pinoHttp());
+app.use(httpLogger);
 
 // ---- CORS ----
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ||
@@ -166,12 +167,12 @@ app.use("/api/videos", videoUploadProxy);
 
 // ---- Error handling ----
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  logger.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
 
 // ---- Start ----
 app.listen(PORT, () => {
-  console.log("Gateway listening on port", PORT);
-  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
+  logger.info("Gateway listening on port", PORT);
+  logger.info("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
 });
