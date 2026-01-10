@@ -130,8 +130,8 @@ const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
 });
 const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions");
 
-// Video upload proxy
-const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
+// Video upload proxy - needs /api/lectures prefix to match svc-video routes
+const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/lectures");
 const uploadsProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/uploads");
 const videosProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/videos");
 
@@ -157,8 +157,10 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
   if (req.path.includes('/notes')) {
     return notesProxy(req, res, next);
   }
-  if (req.path.includes('/transcribe')) {
-    return transcriptionsProxy(req, res, next);
+  if (req.path.includes('/transcribe') || req.path.includes('/transcription')) {
+    // Route /transcribe and /transcription to svc-video
+    console.log("Routing to svc-video for transcription");
+    return videoUploadProxy(req, res, next);
   }
   return lecturesProxy(req, res, next);
 });
@@ -171,8 +173,6 @@ app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
-
-app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Video streaming (no auth required for video playback)
 app.use("/api/videos", videosProxy);
