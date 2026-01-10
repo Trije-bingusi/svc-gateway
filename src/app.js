@@ -125,7 +125,6 @@ const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
 const lecturesProxy = makeProxy(COURSES_URL, "courses", "/api/lectures");
 const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
 const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
-const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
 const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
   internalToken: FORUM_INTERNAL_TOKEN
 });
