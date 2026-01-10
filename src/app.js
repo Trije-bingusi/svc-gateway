@@ -129,7 +129,11 @@ const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
 const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
   internalToken: FORUM_INTERNAL_TOKEN
 });
-const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions");
+const transcriptionsProxy = makeProxy(
+  TRANSCRIPTIONS_URL,
+  "transcriptions",
+  "/api/transcriptions"
+);
 const summaryProxy = makeProxy(SUMMARY_URL, "summary", "/api/lectures");
 
 // Video upload proxy
