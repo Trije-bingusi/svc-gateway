@@ -1,11 +1,12 @@
 import express from "express";
 import client from "prom-client";
-import pinoHttp from "pino-http";
 import YAML from "yamljs";
 import cors from "cors";
 import { apiReference } from "@scalar/express-api-reference";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { requireAuth, requireRoleForWrite } from "./auth.js";
+import { logger, httpLogger } from "./logging.js";
+
 
 function env(name, fallback) {
   const raw = process.env[name];
@@ -23,10 +24,12 @@ const NOTES_URL = env("NOTES_URL");
 const USERS_URL = env("USERS_URL");
 const TRANSCRIPTIONS_URL = env("TRANSCRIPTIONS_URL");
 const VIDEO_UPLOAD_URL = env("VIDEO_UPLOAD_URL");
+const FORUM_URL = env("FORUM_URL");
+const FORUM_INTERNAL_TOKEN = env("FORUM_INTERNAL_TOKEN");
 
 // ---- App ----
 const app = express();
-app.use(pinoHttp());
+app.use(httpLogger);
 
 // ---- CORS ----
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ||
@@ -86,26 +89,28 @@ app.get("/readyz", (_req, res) => res.send("READY"));
 
 // ---- Proxies ----
 
-function makeProxy(target, serviceName, upstreamPrefix) {
+function makeProxy(target, serviceName, upstreamPrefix, opts = {}) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
     logLevel: "silent",
-    
     pathRewrite: upstreamPrefix ? (path) => `${upstreamPrefix}${path}` : undefined,
 
     on: {
       proxyReq: (proxyReq, req) => {
         req._startTime = process.hrtime();
         proxiedCounter.inc({ service: serviceName, method: req.method });
+
         if (req.user?.sub) proxyReq.setHeader("x-user-sub", String(req.user.sub));
+
+        if (opts.internalToken) {
+          proxyReq.setHeader("x-internal-token", opts.internalToken);
+        }
       },
 
       proxyRes: (proxyRes, req) => {
-        // Record response time
         const diff = process.hrtime(req._startTime);
         const durationInSeconds = diff[0] + diff[1] / 1e9;
-
         responseTimeHistogram.observe({
           service: serviceName,
           method: req.method,
@@ -120,6 +125,10 @@ const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
 const lecturesProxy = makeProxy(COURSES_URL, "courses", "/api/lectures");
 const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
 const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
+const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
+const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
+  internalToken: FORUM_INTERNAL_TOKEN
+});
 const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions");
 
 // Video upload proxy
@@ -169,14 +178,17 @@ app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 // Video streaming (no auth required for video playback)
 app.use("/api/videos", videosProxy);
 
+// Forum
+app.use("/api/forum", requireAuth(), forumProxy);
+
 // ---- Error handling ----
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  logger.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
 
 // ---- Start ----
 app.listen(PORT, () => {
-  console.log("Gateway listening on port", PORT);
-  console.log("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
+  logger.info("Gateway listening on port", PORT);
+  logger.info("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
 });

@@ -123,6 +123,18 @@ jobs:
           --name "$AKS_CLUSTER_NAME" \
           --overwrite-existing
 
+        - name: Sync forum token from Key Vault to Kubernetes
+      run: |
+        FORUM_TOKEN=$(az keyvault secret show \
+          --vault-name ${{ vars.KEYVAULT_NAME }} \
+          --name forum-internal-gateway-token \
+          --query value -o tsv
+        )
+
+        kubectl -n "$K8S_NAMESPACE" create secret generic svc-gateway-secrets \
+          --from-literal=forum-internal-token="$FORUM_TOKEN" \
+          --dry-run=client -o yaml | kubectl apply -f - 
+
     - name: Deploy to AKS using Helm
       run: |
         helm upgrade --install "$RELEASE_NAME" ./helm \
