@@ -122,13 +122,19 @@ function makeProxy(target, serviceName, upstreamPrefix, opts = {}) {
 }
 
 const coursesProxy = makeProxy(COURSES_URL, "courses", "/api/courses");
+const lecturesProxy = makeProxy(COURSES_URL, "courses", "/api/lectures");
 const notesProxy   = makeProxy(NOTES_URL,   "notes",   "/api/lectures");
 const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
 const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
-const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
 const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
   internalToken: FORUM_INTERNAL_TOKEN
 });
+const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions");
+
+// Video upload proxy
+const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
+const uploadsProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/uploads");
+const videosProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/videos");
 
 /**
  * Auth + Authorization rules
@@ -155,11 +161,11 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
   if (req.path.includes('/transcribe')) {
     return transcriptionsProxy(req, res, next);
   }
-  return coursesProxy(req, res, next);
+  return lecturesProxy(req, res, next);
 });
 
 // Video uploads
-app.use("/api/uploads", requireAuth(), videoUploadProxy);
+app.use("/api/uploads", requireAuth(), uploadsProxy);
 
 // Transcriptions
 app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
@@ -170,7 +176,7 @@ app.use("/api/users", requireAuth(), usersProxy);
 app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Video streaming (no auth required for video playback)
-app.use("/api/videos", videoUploadProxy);
+app.use("/api/videos", videosProxy);
 
 // Forum
 app.use("/api/forum", requireAuth(), forumProxy);
