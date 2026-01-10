@@ -151,15 +151,19 @@ app.use(
 
 // Lecture-specific routes - check path to determine which service
 app.use("/api/lectures", requireAuth(), (req, res, next) => {
-  if (req.path.includes('/upload')) {
+  if (
+    req.path.includes("/upload") ||
+    req.path.includes("/uploads") ||
+    req.path.includes("/transcribe") ||
+    req.path.includes("/transcription")
+  ) {
     return videoUploadProxy(req, res, next);
   }
-  if (req.path.includes('/notes')) {
+
+  if (req.path.includes("/notes")) {
     return notesProxy(req, res, next);
   }
-  if (req.path.includes('/transcribe')) {
-    return transcriptionsProxy(req, res, next);
-  }
+
   return lecturesProxy(req, res, next);
 });
 
@@ -171,8 +175,6 @@ app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
-
-app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Video streaming (no auth required for video playback)
 app.use("/api/videos", videosProxy);
