@@ -30,6 +30,15 @@ env:
   - name: VIDEO_UPLOAD_URL
     value: http://svc-video-dev-svc-video.rso.svc.cluster.local
 
+  - name: FORUM_URL
+    value: https://forum-bingusi-funcapp-cncah8gyeshqeham.germanywestcentral-01.azurewebsites.net
+
+  - name: FORUM_INTERNAL_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: svc-gateway-secrets
+        key: forum-internal-token
+
   - name: OIDC_ISSUER
     value: https://74.161.129.128.nip.io/keycloak/realms/rso
 
