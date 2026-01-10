@@ -26,6 +26,7 @@ const TRANSCRIPTIONS_URL = env("TRANSCRIPTIONS_URL");
 const VIDEO_UPLOAD_URL = env("VIDEO_UPLOAD_URL");
 const FORUM_URL = env("FORUM_URL");
 const FORUM_INTERNAL_TOKEN = env("FORUM_INTERNAL_TOKEN");
+const SUMMARY_URL = env("SUMMARY_URL");
 
 // ---- App ----
 const app = express();
@@ -129,6 +130,7 @@ const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
   internalToken: FORUM_INTERNAL_TOKEN
 });
 const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions");
+const summaryProxy = makeProxy(SUMMARY_URL, "summary");
 
 // Video upload proxy
 const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
@@ -163,7 +165,9 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
   if (req.path.includes("/notes")) {
     return notesProxy(req, res, next);
   }
-
+  if (req.path.includes('/summary')) {
+    return summaryProxy(req, res, next);
+  }
   return lecturesProxy(req, res, next);
 });
 
@@ -191,5 +195,5 @@ app.use((err, _req, res, _next) => {
 // ---- Start ----
 app.listen(PORT, () => {
   logger.info("Gateway listening on port", PORT);
-  logger.info("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL });
+  logger.info("Upstreams:", { COURSES_URL, NOTES_URL, USERS_URL, VIDEO_UPLOAD_URL, TRANSCRIPTIONS_URL, FORUM_URL, SUMMARY_URL});
 });

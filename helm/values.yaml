@@ -29,6 +29,8 @@ env:
     value: http://svc-transcription-dev-svc-transcription.rso.svc.cluster.local
   - name: VIDEO_UPLOAD_URL
     value: http://svc-video-dev-svc-video.rso.svc.cluster.local
+  - name: SUMMARY_URL
+    value: http://svc-summary-dev-svc-summary.rso.svc.cluster.local
 
   - name: FORUM_URL
     value: https://forum-bingusi-funcapp-cncah8gyeshqeham.germanywestcentral-01.azurewebsites.net
