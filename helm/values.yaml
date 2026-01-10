@@ -62,6 +62,13 @@ ingress:
   defaultHost: ""        # set via --set ingress.defaultHost=... in deploy.sh
   enabled: true
   className: nginx
+
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "5g"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+
   hosts:
     - host: ""           # template can default to ingress.defaultHost
       paths:
