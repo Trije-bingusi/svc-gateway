@@ -129,15 +129,13 @@ const usersProxy   = makeProxy(USERS_URL,   "users",   "/api/users");
 const forumProxy = makeProxy(FORUM_URL, "forum", "/api", {
   internalToken: FORUM_INTERNAL_TOKEN
 });
-const transcriptionsProxy = makeProxy(
-  TRANSCRIPTIONS_URL,
-  "transcriptions",
-  "/api/transcriptions"
-);
+const transcriptionsProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/transcriptions");
+const transcriptionLectureProxy = makeProxy(TRANSCRIPTIONS_URL, "transcriptions", "/api/lectures");
 const summaryProxy = makeProxy(SUMMARY_URL, "summary", "/api/lectures");
 
 // Video upload proxy
 const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/lectures");
+
 
 /**
  * Auth + Authorization rules
@@ -159,13 +157,12 @@ app.use("/api/lectures", requireAuth(), (req, res, next) => {
     return videoUploadProxy(req, res, next);
   }
 
-  if (req.path.includes("/notes")) {
-    return notesProxy(req, res, next);
+  if (req.path.endsWith("/transcription")) {
+    return transcriptionLectureProxy(req, res, next);
   }
 
-  if (req.path.includes("/summary")) {
-    return summaryProxy(req, res, next);
-  }
+  if (req.path.includes("/notes")) return notesProxy(req, res, next);
+  if (req.path.includes("/summary")) return summaryProxy(req, res, next);
 
   return lecturesProxy(req, res, next);
 });
