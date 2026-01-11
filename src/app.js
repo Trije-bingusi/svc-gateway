@@ -137,9 +137,7 @@ const transcriptionsProxy = makeProxy(
 const summaryProxy = makeProxy(SUMMARY_URL, "summary", "/api/lectures");
 
 // Video upload proxy
-const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload");
-const uploadsProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/uploads");
-const videosProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/videos");
+const videoUploadProxy = makeProxy(VIDEO_UPLOAD_URL, "video-upload", "/api/lectures");
 
 /**
  * Auth + Authorization rules
@@ -157,35 +155,26 @@ app.use(
 
 // Lecture-specific routes - check path to determine which service
 app.use("/api/lectures", requireAuth(), (req, res, next) => {
-  if (
-    req.path.includes("/upload") ||
-    req.path.includes("/uploads") ||
-    req.path.includes("/transcribe") ||
-    req.path.includes("/transcription")
-  ) {
+  if (req.path.includes("/videos")) {
     return videoUploadProxy(req, res, next);
   }
 
   if (req.path.includes("/notes")) {
     return notesProxy(req, res, next);
   }
-  if (req.path.includes('/summary')) {
+
+  if (req.path.includes("/summary")) {
     return summaryProxy(req, res, next);
   }
+
   return lecturesProxy(req, res, next);
 });
-
-// Video uploads
-app.use("/api/uploads", requireAuth(), uploadsProxy);
 
 // Transcriptions
 app.use("/api/transcriptions", requireAuth(), transcriptionsProxy);
 
 // Users profile endpoints
 app.use("/api/users", requireAuth(), usersProxy);
-
-// Video streaming (no auth required for video playback)
-app.use("/api/videos", videosProxy);
 
 // Forum
 app.use("/api/forum", requireAuth(), forumProxy);

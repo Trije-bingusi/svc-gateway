@@ -28,7 +28,7 @@ env:
   - name: TRANSCRIPTIONS_URL
     value: http://svc-transcription-dev-svc-transcription.rso.svc.cluster.local
   - name: VIDEO_UPLOAD_URL
-    value: http://svc-video-dev-svc-video.rso.svc.cluster.local
+    value: http://svc-videos-dev-svc-videos.rso.svc.cluster.local
   - name: SUMMARY_URL
     value: http://svc-summary-dev-svc-summary.rso.svc.cluster.local
 
