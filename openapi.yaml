@@ -2,96 +2,908 @@ openapi: 3.0.3
 info:
   title: RSO API Gateway
   version: 1.0.0
+  description: >
+    Public API surface for the RSO platform. The gateway is the single entry point for clients and routes
+    requests to internal microservices. Authentication is performed using a Keycloak-issued OIDC JWT access
+    token (Authorization: Bearer <token>).
+
+    Notes:
+      - All /api/** endpoints require authentication (Bearer JWT).
+      - Creating courses and creating lectures under a course require the `professor` role (enforced by the gateway).
+      - Health and metrics endpoints are unauthenticated.
 servers:
   - url: /
+
+tags:
+  - name: System
+  - name: Courses
+  - name: Lectures
+  - name: Notes
+  - name: Videos
+  - name: Transcriptions
+  - name: Summary
+  - name: Users
+  - name: Forum
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+      required: [error]
+
+    # ----- Courses / Lectures (svc-courses) -----
+    Course:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+      required: [id, name, created_at]
+
+    Lecture:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        course_id: { type: string, format: uuid }
+        title: { type: string }
+        manifest_url: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [id, course_id, title, created_at]
+
+    CreateCourseRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Cloud Services (RSO)
+
+    CreateLectureRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          example: Lecture 1 – Introduction
+        manifest_url:
+          type: string
+          nullable: true
+          example: https://example.com/hls/lecture1.m3u8
+
+    UpdateLectureRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: New lecture title (optional).
+        manifest_url:
+          type: string
+          nullable: true
+          description: New HLS manifest URL (optional).
+
+    # ----- Notes (svc-notes) -----
+    Note:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        lecture_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid, nullable: true }
+        content: { type: string }
+        created_at: { type: string, format: date-time }
+      required: [id, lecture_id, content, created_at]
+
+    CreateNoteRequest:
+      type: object
+      required: [content]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        content:
+          type: string
+          example: Important remark about slide 5…
+
+    # ----- Users (svc-users) -----
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        oidc_sub: { type: string, description: OIDC subject (sub) from the JWT token. }
+        email: { type: string, nullable: true }
+        display_name: { type: string, nullable: true }
+        role:
+          type: string
+          nullable: true
+          description: Application role derived from Keycloak realm roles (student/professor).
+      required: [id, oidc_sub]
+
+    UpdateUserProfileRequest:
+      type: object
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+          example: Janez Novak
+
+    # ----- Videos (svc-video) -----
+    VideoUploadResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+          description: SAS URL for uploading the video blob to Azure Blob Storage.
+        videoId: { type: string, format: uuid }
+        lectureId: { type: string, format: uuid }
+      required: [uploadUrl, videoId, lectureId]
+
+    VideoGetResponse:
+      type: object
+      properties:
+        videoId: { type: string, format: uuid }
+        lectureId: { type: string, format: uuid }
+        videoUrl:
+          type: string
+          description: Read-only SAS URL for streaming/downloading the latest uploaded lecture video.
+      required: [videoId, lectureId, videoUrl]
+
+    # ----- Transcriptions (svc-transcription) -----
+    CreateTranscriptionJobRequest:
+      type: object
+      required: [lecture_id, video_url, video_blob_name]
+      properties:
+        lecture_id: { type: string, format: uuid }
+        video_url:
+          type: string
+          description: SAS READ URL used by the service to download the video for processing.
+        video_blob_name:
+          type: string
+          description: Blob name in storage, e.g. "abc.mp4".
+        language:
+          type: string
+          default: sl
+          description: Language code for transcription (default: sl).
+
+    CreateTranscriptionJobResponse:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status:
+          type: string
+          example: queued
+      required: [job_id, status]
+
+    TranscriptionJobStatusResponse:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        lecture_id: { type: string, format: uuid }
+        status:
+          type: string
+          description: queued | processing | done | failed
+        error:
+          type: string
+          nullable: true
+        transcript_json_blob:
+          type: string
+          nullable: true
+        transcript_vtt_blob:
+          type: string
+          nullable: true
+        video_blob_name:
+          type: string
+      required: [job_id, lecture_id, status, video_blob_name]
+
+    LectureTranscriptionResponse:
+      type: object
+      properties:
+        transcript_json_url:
+          type: string
+          description: Read-only SAS URL to the transcript JSON.
+        transcript_vtt_url:
+          type: string
+          description: Read-only SAS URL to the transcript VTT (subtitles).
+      required: [transcript_json_url, transcript_vtt_url]
+
+    # ----- Summary (svc-summary) -----
+    SummaryGetResponse:
+      type: object
+      properties:
+        summary: { type: string }
+      required: [summary]
+
+    SummaryStartRequest:
+      type: object
+      properties:
+        transcription:
+          type: string
+          description: Full transcription text (optional if transcriptionJsonUrl is provided).
+        transcriptionJsonUrl:
+          type: string
+          description: URL to transcription JSON (optional if transcription is provided).
+      description: At least one of `transcription` or `transcriptionJsonUrl` must be provided.
+
+    SummaryStartResponse:
+      type: object
+      properties:
+        message: { type: string, example: Summary generation started }
+      required: [message]
+
+    # ----- Forum (svc-forum Azure Functions) -----
+    ForumThread:
+      type: object
+      properties:
+        id: { type: string }
+        courseId: { type: string, format: uuid }
+        title: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, courseId, title, createdAt]
+
+    CreateForumThreadRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title: { type: string, example: Exam preparation tips }
+        content:
+          type: string
+          example: What are the most important topics for the midterm?
+
+    ForumPost:
+      type: object
+      properties:
+        id: { type: string }
+        threadId: { type: string }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, threadId, content, createdAt]
+
+    CreateForumPostRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, example: Focus on ingress + OIDC flows, those were emphasized in labs. }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid access token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            missing_token:
+              value: { error: "missing_token" }
+            invalid_token:
+              value: { error: "invalid_token" }
+
+    ForbiddenProfessor:
+      description: Authenticated but missing required professor role
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            forbidden:
+              value: { error: "forbidden", requiredRole: "professor" }
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            internal:
+              value: { error: "Internal server error" }
+
+# Default security: all /api/** endpoints require BearerAuth. System endpoints override this.
+security:
+  - BearerAuth: []
+
 paths:
+  # ---------------- System ----------------
   /healthz:
     get:
+      tags: [System]
       summary: Liveness probe
+      security: []
       responses:
         "200":
           description: OK
+
   /readyz:
     get:
+      tags: [System]
       summary: Readiness probe
+      security: []
       responses:
         "200":
           description: READY
+
   /metrics:
     get:
+      tags: [System]
       summary: Prometheus metrics
+      description: Exposes Prometheus metrics for the gateway.
+      security: []
       responses:
         "200":
-          description: Metrics output
+          description: Metrics output (text/plain)
 
+  # ---------------- Courses (via gateway -> svc-courses) ----------------
   /api/courses:
     get:
-      summary: Proxied to Courses service
+      tags: [Courses]
+      summary: List courses
       responses:
         "200":
-          description: OK
+          description: Courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Course" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
     post:
-      summary: Proxied to Courses service (professor only)
+      tags: [Courses]
+      summary: Create course
+      description: Requires `professor` role (enforced by gateway).
       responses:
         "201":
-          description: Created
+          description: Created course
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+        "400":
+          description: Validation error (e.g., missing name)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_name:
+                  value: { error: "Name is required!" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/ForbiddenProfessor"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCourseRequest" }
 
   /api/courses/{courseId}/lectures:
     get:
-      summary: Proxied to Courses service
+      tags: [Lectures]
+      summary: List lectures for a course
       parameters:
         - in: path
           name: courseId
           required: true
-          schema:
-            type: string
+          schema: { type: string, format: uuid }
       responses:
         "200":
-          description: OK
+          description: Lectures
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Lecture" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
     post:
-      summary: Proxied to Courses service (professor only)
+      tags: [Lectures]
+      summary: Create lecture for a course
+      description: Requires `professor` role (enforced by gateway on /api/courses).
       parameters:
         - in: path
           name: courseId
           required: true
-          schema:
-            type: string
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateLectureRequest" }
       responses:
         "201":
-          description: Created
+          description: Created lecture
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Lecture" }
+        "400":
+          description: Validation error (e.g., missing title)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_title:
+                  value: { error: "Title is required!" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/ForbiddenProfessor"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
+  /api/lectures/{lectureId}:
+    get:
+      tags: [Lectures]
+      summary: Get a single lecture
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lecture
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Lecture" }
+        "404":
+          description: Lecture not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                not_found:
+                  value: { error: "Lecture not found" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      tags: [Lectures]
+      summary: Update a lecture
+      description: >
+        Updates lecture fields (title and/or manifest_url). Note: based on current gateway configuration,
+        this endpoint is authenticated but not role-restricted.
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateLectureRequest" }
+      responses:
+        "200":
+          description: Updated lecture
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Lecture" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------- Notes (via gateway -> svc-notes) ----------------
   /api/lectures/{lectureId}/notes:
     get:
-      summary: Proxied to Notes service
+      tags: [Notes]
+      summary: List notes for a lecture
       parameters:
         - in: path
           name: lectureId
           required: true
-          schema:
-            type: string
+          schema: { type: string, format: uuid }
       responses:
         "200":
-          description: OK
+          description: Notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Note" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
     post:
-      summary: Proxied to Notes service
+      tags: [Notes]
+      summary: Create note for a lecture
       parameters:
         - in: path
           name: lectureId
           required: true
-          schema:
-            type: string
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateNoteRequest" }
       responses:
         "201":
-          description: Created
+          description: Created note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        "400":
+          description: Validation error (e.g., missing content)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_content:
+                  value: { error: "Content is required!" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
+  # ---------------- Videos (via gateway -> svc-video) ----------------
+  /api/lectures/{lectureId}/videos:
+    post:
+      tags: [Videos]
+      summary: Request a SAS URL for uploading a lecture video
+      description: Returns an upload SAS URL and creates a DB record for tracking upload status.
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: SAS upload URL created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoUploadResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags: [Videos]
+      summary: Get the latest uploaded lecture video (SAS read URL)
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Latest uploaded lecture video
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoGetResponse" }
+        "404":
+          description: No video found for this lecture
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                not_found:
+                  value: { error: "No video found for this lecture" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------- Transcriptions (via gateway -> svc-transcription) ----------------
+  /api/transcriptions:
+    post:
+      tags: [Transcriptions]
+      summary: Create a transcription job
+      description: Creates (or reuses) a transcription job for a lecture video.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTranscriptionJobRequest" }
+      responses:
+        "202":
+          description: Job accepted (queued/processing)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateTranscriptionJobResponse" }
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_fields:
+                  value: { error: "lecture_id, video_url, video_blob_name are required" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/transcriptions/{jobId}:
+    get:
+      tags: [Transcriptions]
+      summary: Get transcription job status
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TranscriptionJobStatusResponse" }
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                not_found:
+                  value: { error: "Not found" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/lectures/{lectureId}/transcription:
+    get:
+      tags: [Transcriptions]
+      summary: Get transcription for a lecture (SAS URLs)
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: SAS URLs for transcript JSON and VTT
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LectureTranscriptionResponse" }
+        "404":
+          description: Transcription not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                not_found:
+                  value: { error: "Not found" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------- Summary (via gateway -> svc-summary) ----------------
+  /api/lectures/{lectureId}/summary:
+    get:
+      tags: [Summary]
+      summary: Get latest summary for a lecture
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SummaryGetResponse" }
+        "404":
+          description: Summary not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                not_found:
+                  value: { error: "Summary not found" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Summary]
+      summary: Start summary generation for a lecture
+      description: Returns immediately (202). Summary generation runs asynchronously.
+      parameters:
+        - in: path
+          name: lectureId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SummaryStartRequest" }
+      responses:
+        "202":
+          description: Summary generation started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SummaryStartResponse" }
+        "400":
+          description: Missing transcription input
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_input:
+                  value: { error: "Missing transcription or transcriptionJsonUrl in request body" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------- Users (via gateway -> svc-users) ----------------
   /api/users/me:
     get:
-      summary: Proxied to Users service
+      tags: [Users]
+      summary: Get (or create) current user profile
       responses:
         "200":
-          description: OK
+          description: User profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "400":
+          description: Token missing sub
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_sub:
+                  value: { error: "Token missing sub" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
     put:
-      summary: Proxied to Users service
+      tags: [Users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserProfileRequest" }
       responses:
         "200":
-          description: OK
+          description: Updated user profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_display_name:
+                  value: { error: "display_name is required" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------- Forum (via gateway -> Azure Functions svc-forum) ----------------
+  /api/forum/courses/{courseId}/threads:
+    get:
+      tags: [Forum]
+      summary: List forum threads for a course
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ForumThread" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Forum]
+      summary: Create a forum thread for a course
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateForumThreadRequest" }
+      responses:
+        "201":
+          description: Created thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumThread" }
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                invalid_body:
+                  value: { error: "invalid_body" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/forum/threads/{threadId}/posts:
+    get:
+      tags: [Forum]
+      summary: List posts in a thread
+      parameters:
+        - in: path
+          name: threadId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ForumPost" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Forum]
+      summary: Create a post in a thread
+      parameters:
+        - in: path
+          name: threadId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateForumPostRequest" }
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumPost" }
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                invalid_body:
+                  value: { error: "invalid_body" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
